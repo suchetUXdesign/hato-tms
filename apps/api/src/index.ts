@@ -47,10 +47,12 @@ app.use((_req, res) => {
 // ---- Global Error Handler ----
 app.use(errorHandler);
 
-// ---- Start Server ----
-app.listen(PORT, () => {
-  console.log(`[Hato TMS API] Server running on port ${PORT}`);
-  console.log(`[Hato TMS API] Health check: http://localhost:${PORT}/health`);
-});
+// ---- Start Server (local dev only) ----
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[Hato TMS API] Server running on port ${PORT}`);
+    console.log(`[Hato TMS API] Health check: http://localhost:${PORT}/health`);
+  });
+}
 
 export default app;
