@@ -255,9 +255,9 @@ function renderAuth(): string {
       </p>
       <div style="margin-bottom: 12px;">
         <label style="display: block; font-size: 11px; font-weight: 500; color: #555; margin-bottom: 4px;">API URL</label>
-        <input id="auth-url" type="text" value="http://localhost:4000"
+        <input id="auth-url" type="text" value="https://hato-tms-api.vercel.app"
           style="width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; outline: none;"
-          placeholder="http://localhost:4000" />
+          placeholder="https://hato-tms-api.vercel.app" />
       </div>
       <div style="margin-bottom: 12px;">
         <label style="display: block; font-size: 11px; font-weight: 500; color: #555; margin-bottom: 4px;">API Token</label>
