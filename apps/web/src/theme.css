@@ -1,0 +1,131 @@
+/* ============================================================
+   Hato TMS — Theme Variables & Dark Mode
+   ============================================================ */
+
+/* Base element theming */
+body {
+  background: var(--hato-bg-secondary);
+  color: var(--hato-text-primary);
+  margin: 0;
+}
+
+:root {
+  /* Surfaces */
+  --hato-bg-primary: #ffffff;
+  --hato-bg-secondary: #F8F9FC;
+  --hato-bg-elevated: #ffffff;
+  --hato-bg-sidebar: #ffffff;
+  --hato-bg-header: #ffffff;
+  --hato-bg-code: #f6f8fa;
+  --hato-bg-hover: rgba(0, 0, 0, 0.04);
+  --hato-bg-dropdown: #ffffff;
+  --hato-bg-dropdown-header: #FAFAFF;
+  --hato-bg-input: #fafafa;
+
+  /* Text */
+  --hato-text-primary: #1a1a2e;
+  --hato-text-secondary: #8c8c8c;
+  --hato-text-code: #555555;
+
+  /* Borders */
+  --hato-border: #e8e8ef;
+  --hato-border-light: #f0f0f0;
+
+  /* Accent */
+  --hato-accent: #4F46E5;
+  --hato-accent-hover: #4338CA;
+
+  /* Diffs */
+  --hato-diff-add-bg: #f6ffed;
+  --hato-diff-add-border: #b7eb8f;
+  --hato-diff-del-bg: #fff1f0;
+  --hato-diff-del-border: #ffccc7;
+
+  /* Shadows */
+  --hato-shadow-dropdown: 0 6px 16px 0 rgba(0,0,0,0.08), 0 3px 6px -4px rgba(0,0,0,0.12), 0 9px 28px 8px rgba(0,0,0,0.05);
+
+  /* Logout hover */
+  --hato-logout-hover: #fff1f0;
+}
+
+[data-theme="dark"] {
+  /* Surfaces */
+  --hato-bg-primary: #141414;
+  --hato-bg-secondary: #1a1a1a;
+  --hato-bg-elevated: #1f1f1f;
+  --hato-bg-sidebar: #141414;
+  --hato-bg-header: #1f1f1f;
+  --hato-bg-code: #2a2a2a;
+  --hato-bg-hover: rgba(255, 255, 255, 0.08);
+  --hato-bg-dropdown: #1f1f1f;
+  --hato-bg-dropdown-header: #262630;
+  --hato-bg-input: #2a2a2a;
+
+  /* Text */
+  --hato-text-primary: #e8e8e8;
+  --hato-text-secondary: #8c8c8c;
+  --hato-text-code: #b0b0b0;
+
+  /* Borders */
+  --hato-border: #303030;
+  --hato-border-light: #2a2a2a;
+
+  /* Accent */
+  --hato-accent: #6C63FF;
+  --hato-accent-hover: #7B73FF;
+
+  /* Diffs */
+  --hato-diff-add-bg: #162312;
+  --hato-diff-add-border: #274916;
+  --hato-diff-del-bg: #2a1215;
+  --hato-diff-del-border: #58181c;
+
+  /* Shadows */
+  --hato-shadow-dropdown: 0 6px 16px 0 rgba(0,0,0,0.3), 0 3px 6px -4px rgba(0,0,0,0.4), 0 9px 28px 8px rgba(0,0,0,0.2);
+
+  /* Logout hover */
+  --hato-logout-hover: rgba(255, 77, 79, 0.1);
+}
+
+/* ============================================================
+   Global Transition (smooth theme switch)
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Don't transition everything — only bg/border. Avoid text color transitions
+   as they look strange on interactive elements. Also exclude animations
+   that antd uses (collapse, modal, etc.) */
+.ant-collapse-content,
+.ant-modal-mask,
+.ant-drawer-mask,
+.ant-notification,
+.ant-message {
+  transition: none !important;
+}
+
+/* ============================================================
+   Scrollbar (dark mode)
+   ============================================================ */
+
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

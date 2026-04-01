@@ -1,0 +1,26 @@
+{
+  "name": "hato-tms",
+  "version": "1.0.0",
+  "bin": { "hato-tms": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@hato-tms/shared": "*",
+    "axios": "^1.7.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "conf": "^10.2.0",
+    "csv-parse": "^5.6.0",
+    "csv-stringify": "^6.5.0",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^8.2.10",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

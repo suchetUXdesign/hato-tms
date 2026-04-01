@@ -1,0 +1,141 @@
+name: Sync Translations from Hato TMS
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC (13:00 ICT)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      namespaces:
+        description: "Comma-separated namespace paths (e.g. common,dashboard,errors)"
+        required: false
+        default: ""
+      output_dir:
+        description: "Output directory for locale files"
+        required: false
+        default: "src/locales"
+      format:
+        description: "Export format: nested or flat"
+        required: false
+        default: "nested"
+        type: choice
+        options:
+          - nested
+          - flat
+
+env:
+  HATO_TMS_API_URL: ${{ secrets.HATO_TMS_API_URL }}
+  HATO_TMS_API_TOKEN: ${{ secrets.HATO_TMS_API_TOKEN }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate secrets
+        run: |
+          if [ -z "$HATO_TMS_API_URL" ]; then
+            echo "::error::HATO_TMS_API_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "$HATO_TMS_API_TOKEN" ]; then
+            echo "::error::HATO_TMS_API_TOKEN secret is not set"
+            exit 1
+          fi
+
+      - name: Set variables
+        id: vars
+        run: |
+          # Use inputs if provided (workflow_dispatch), otherwise use defaults
+          NAMESPACES="${{ github.event.inputs.namespaces || '' }}"
+          OUTPUT_DIR="${{ github.event.inputs.output_dir || 'src/locales' }}"
+          FORMAT="${{ github.event.inputs.format || 'nested' }}"
+
+          echo "namespaces=$NAMESPACES" >> "$GITHUB_OUTPUT"
+          echo "output_dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
+          echo "format=$FORMAT" >> "$GITHUB_OUTPUT"
+
+      - name: Pull translations from Hato TMS
+        run: |
+          set -euo pipefail
+
+          API_URL="${HATO_TMS_API_URL}"
+          TOKEN="${HATO_TMS_API_TOKEN}"
+          OUTPUT_DIR="${{ steps.vars.outputs.output_dir }}"
+          FORMAT="${{ steps.vars.outputs.format }}"
+          NAMESPACES="${{ steps.vars.outputs.namespaces }}"
+
+          mkdir -p "$OUTPUT_DIR"
+
+          # Build query string
+          QUERY="format=${FORMAT}"
+          if [ -n "$NAMESPACES" ]; then
+            QUERY="${QUERY}&namespaces=${NAMESPACES}"
+          fi
+
+          echo "Pulling Thai translations..."
+          curl -sf \
+            -H "X-API-Token: ${TOKEN}" \
+            -H "Accept: application/json" \
+            "${API_URL}/api/v1/import-export/export/json?${QUERY}&locale=TH" \
+            -o "${OUTPUT_DIR}/th.json"
+
+          echo "Pulling English translations..."
+          curl -sf \
+            -H "X-API-Token: ${TOKEN}" \
+            -H "Accept: application/json" \
+            "${API_URL}/api/v1/import-export/export/json?${QUERY}&locale=EN" \
+            -o "${OUTPUT_DIR}/en.json"
+
+          echo "Translations written to ${OUTPUT_DIR}/"
+          echo "  th.json: $(wc -l < "${OUTPUT_DIR}/th.json") lines"
+          echo "  en.json: $(wc -l < "${OUTPUT_DIR}/en.json") lines"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No translation changes detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Translation changes detected:"
+            git diff --cached --stat
+          fi
+
+      - name: Create Pull Request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/sync-translations
+          delete-branch: true
+          title: "chore: sync translations from Hato TMS"
+          body: |
+            Automated translation sync from Hato TMS.
+
+            This PR was created by the `sync-translations` workflow.
+
+            **Changes:**
+            - Updated locale files in `${{ steps.vars.outputs.output_dir }}/`
+            - Format: `${{ steps.vars.outputs.format }}`
+            - Namespaces: `${{ steps.vars.outputs.namespaces || 'all' }}`
+
+            ---
+            *Review the JSON diffs below to verify translation changes.*
+          commit-message: "chore: sync translations from Hato TMS"
+          labels: |
+            i18n
+            automated

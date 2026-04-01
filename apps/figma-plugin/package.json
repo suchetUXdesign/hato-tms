@@ -1,0 +1,16 @@
+{
+  "name": "@hato-tms/figma-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node build.mjs --watch",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@hato-tms/shared": "*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

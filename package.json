@@ -1,0 +1,26 @@
+{
+  "name": "hato-tms",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "prisma generate --schema packages/db/prisma/schema.prisma",
+    "dev": "npx turbo dev",
+    "build": "npx turbo build",
+    "lint": "npx turbo lint",
+    "dev:api": "npm -w @hato-tms/api run dev",
+    "dev:web": "npm -w @hato-tms/web run dev",
+    "db:generate": "npm -w @hato-tms/db run generate",
+    "db:migrate": "npm -w @hato-tms/db run migrate",
+    "db:seed": "npm -w @hato-tms/db run seed",
+    "db:studio": "npm -w @hato-tms/db run studio"
+  },
+  "devDependencies": {
+    "prisma": "^6.3.0",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "npm@10.2.0"
+}

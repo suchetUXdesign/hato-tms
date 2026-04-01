@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---- Users ----
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(VIEWER)
+  isActive  Boolean  @default(true) @map("is_active")
+  apiToken  String?  @unique @map("api_token")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdKeys      TranslationKey[]   @relation("KeyCreator")
+  updatedValues    TranslationValue[] @relation("ValueUpdater")
+  authoredCRs      ChangeRequest[]    @relation("CRAuthor")
+  reviewAssignments CRReviewer[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  TRANSLATOR
+  VIEWER
+  DEVELOPER  // legacy — maps to EDITOR
+  REVIEWER   // legacy — maps to EDITOR
+}
+
+// ---- Namespaces ----
+
+model Namespace {
+  id          String     @id @default(cuid())
+  path        String     @unique // dot notation: liff.dinein.menu
+  description String?
+  platforms   Platform[] @default([])
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  keys TranslationKey[]
+
+  @@map("namespaces")
+}
+
+enum Platform {
+  HS
+  HH
+  LIFF
+  MERCHANT
+  FLEX
+  COMMON
+}
+
+// ---- Translation Keys ----
+
+model TranslationKey {
+  id          String    @id @default(cuid())
+  namespaceId String    @map("namespace_id")
+  keyName     String    @map("key_name") // camelCase element name
+  description String?
+  tags        String[]  @default([])
+  status      KeyStatus @default(PENDING)
+  platforms   Platform[] @default([])
+  createdById String?   @map("created_by_id")
+  deletedAt   DateTime? @map("deleted_at") // soft delete
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  namespace Namespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation("KeyCreator", fields: [createdById], references: [id])
+  values    TranslationValue[]
+  crItems   CRItem[]
+
+  @@unique([namespaceId, keyName])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("translation_keys")
+}
+
+enum KeyStatus {
+  TRANSLATED
+  PENDING
+  IN_REVIEW
+}
+
+// ---- Translation Values ----
+
+model TranslationValue {
+  id          String   @id @default(cuid())
+  keyId       String   @map("key_id")
+  locale      Locale
+  value       String
+  version     Int      @default(1)
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  key       TranslationKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+  updatedBy User?          @relation("ValueUpdater", fields: [updatedById], references: [id])
+
+  @@unique([keyId, locale, version])
+  @@index([keyId, locale])
+  @@map("translation_values")
+}
+
+enum Locale {
+  TH
+  EN
+}
+
+// ---- Change Requests ----
+
+model ChangeRequest {
+  id        String   @id @default(cuid())
+  title     String
+  status    CRStatus @default(DRAFT)
+  authorId  String   @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  author    User         @relation("CRAuthor", fields: [authorId], references: [id])
+  reviewers CRReviewer[]
+  items     CRItem[]
+
+  @@index([status])
+  @@map("change_requests")
+}
+
+enum CRStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+model CRReviewer {
+  id              String  @id @default(cuid())
+  changeRequestId String  @map("change_request_id")
+  userId          String  @map("user_id")
+  approved        Boolean @default(false)
+
+  changeRequest ChangeRequest @relation(fields: [changeRequestId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@unique([changeRequestId, userId])
+  @@map("cr_reviewers")
+}
+
+model CRItem {
+  id              String  @id @default(cuid())
+  changeRequestId String  @map("change_request_id")
+  keyId           String  @map("key_id")
+  locale          Locale
+  oldValue        String? @map("old_value")
+  newValue        String  @map("new_value")
+  comment         String?
+
+  changeRequest ChangeRequest  @relation(fields: [changeRequestId], references: [id], onDelete: Cascade)
+  key           TranslationKey @relation(fields: [keyId], references: [id])
+
+  @@map("cr_items")
+}
+
+// ---- Audit Log ----
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String   // e.g., "key.created", "value.updated"
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  actorId    String   @map("actor_id")
+  diff       Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

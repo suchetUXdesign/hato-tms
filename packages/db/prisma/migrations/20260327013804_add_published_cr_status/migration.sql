@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "CRStatus" ADD VALUE 'PUBLISHED';
