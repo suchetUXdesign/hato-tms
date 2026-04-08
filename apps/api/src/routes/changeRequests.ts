@@ -1,11 +1,12 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { prisma } from "@hato-tms/db";
 import { buildFullKey, AuditAction } from "@hato-tms/shared";
 import { authMiddleware } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditService";
 import * as cache from "../services/cacheService";
+import * as changeRequestService from "../services/changeRequestService";
+import * as keyService from "../services/keyService";
 
 const router = Router();
 
@@ -45,27 +46,11 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     const size = Math.min(100, Math.max(1, parseInt(pageSize || "20", 10)));
     const skip = (pageNum - 1) * size;
 
-    const where: any = {};
-    if (status) {
-      where.status = status;
-    }
-
-    const [crs, total] = await Promise.all([
-      prisma.changeRequest.findMany({
-        where,
-        include: {
-          author: { select: { id: true, name: true } },
-          reviewers: {
-            include: { user: { select: { id: true, name: true } } },
-          },
-          _count: { select: { items: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-        skip,
-        take: size,
-      }),
-      prisma.changeRequest.count({ where }),
-    ]);
+    const { crs, total } = await changeRequestService.listChangeRequests({
+      status,
+      skip,
+      take: size,
+    });
 
     res.json({
       data: crs.map((cr) => ({
@@ -100,13 +85,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 
     // Validate all referenced keys exist
     const keyIds = [...new Set(body.items.map((i) => i.keyId))];
-    const keys = await prisma.translationKey.findMany({
-      where: { id: { in: keyIds }, deletedAt: null },
-      include: {
-        values: { orderBy: { version: "desc" } },
-        namespace: { select: { path: true } },
-      },
-    });
+    const keys = await changeRequestService.validateKeyIds(keyIds);
     if (keys.length !== keyIds.length) {
       throw new AppError("Some referenced keys not found", 404);
     }
@@ -126,29 +105,11 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       };
     });
 
-    const cr = await prisma.changeRequest.create({
-      data: {
-        title: body.title,
-        status: "PENDING",
-        authorId: req.user!.id,
-        items: { create: itemsData },
-        reviewers: {
-          create: body.reviewerIds.map((userId) => ({ userId })),
-        },
-      },
-      include: {
-        author: { select: { name: true } },
-        items: {
-          include: {
-            key: {
-              include: { namespace: { select: { path: true } } },
-            },
-          },
-        },
-        reviewers: {
-          include: { user: { select: { id: true, name: true } } },
-        },
-      },
+    const cr = await changeRequestService.createChangeRequest({
+      title: body.title,
+      authorId: req.user!.id,
+      items: itemsData,
+      reviewerIds: body.reviewerIds,
     });
 
     await logAudit(
@@ -190,22 +151,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 // ---- GET /:id — Get single CR with items and diff ----
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cr = await prisma.changeRequest.findUnique({
-      where: { id: req.params.id },
-      include: {
-        author: { select: { id: true, name: true, email: true } },
-        items: {
-          include: {
-            key: {
-              include: { namespace: { select: { path: true } } },
-            },
-          },
-        },
-        reviewers: {
-          include: { user: { select: { id: true, name: true } } },
-        },
-      },
-    });
+    const cr = await changeRequestService.getChangeRequestById(req.params.id);
 
     if (!cr) {
       throw new AppError("Change request not found", 404);
@@ -247,10 +193,7 @@ router.put(
       const body = reviewSchema.parse(req.body);
       const crId = req.params.id;
 
-      const cr = await prisma.changeRequest.findUnique({
-        where: { id: crId },
-        include: { reviewers: true },
-      });
+      const cr = await changeRequestService.getChangeRequestWithReviewers(crId);
 
       if (!cr) {
         throw new AppError("Change request not found", 404);
@@ -271,26 +214,14 @@ router.put(
       // Find or create reviewer record
       let reviewer = cr.reviewers.find((r) => r.userId === req.user!.id);
       if (!reviewer) {
-        reviewer = await prisma.cRReviewer.create({
-          data: {
-            changeRequestId: crId,
-            userId: req.user!.id,
-            approved: false,
-          },
-        });
+        reviewer = await changeRequestService.createReviewer(crId, req.user!.id);
       }
 
       if (body.action === "approve") {
-        await prisma.cRReviewer.update({
-          where: { id: reviewer.id },
-          data: { approved: true },
-        });
+        await changeRequestService.approveReviewer(reviewer.id);
 
         // Any single approval (admin or assigned reviewer) approves the CR
-        await prisma.changeRequest.update({
-          where: { id: crId },
-          data: { status: "APPROVED" },
-        });
+        await changeRequestService.setChangeRequestStatus(crId, "APPROVED");
 
         await logAudit(
           AuditAction.CR_APPROVED,
@@ -299,10 +230,7 @@ router.put(
           req.user!.id
         );
       } else if (body.action === "reject") {
-        await prisma.changeRequest.update({
-          where: { id: crId },
-          data: { status: "REJECTED" },
-        });
+        await changeRequestService.setChangeRequestStatus(crId, "REJECTED");
 
         await logAudit(
           AuditAction.CR_REJECTED,
@@ -313,14 +241,7 @@ router.put(
       }
       // "request-changes" keeps status as PENDING
 
-      const updated = await prisma.changeRequest.findUnique({
-        where: { id: crId },
-        include: {
-          reviewers: {
-            include: { user: { select: { id: true, name: true } } },
-          },
-        },
-      });
+      const updated = await changeRequestService.reloadChangeRequestWithReviewers(crId);
 
       res.json({
         id: updated!.id,
@@ -344,16 +265,7 @@ router.put(
     try {
       const crId = req.params.id;
 
-      const cr = await prisma.changeRequest.findUnique({
-        where: { id: crId },
-        include: {
-          items: {
-            include: {
-              key: { include: { values: { orderBy: { version: "desc" } } } },
-            },
-          },
-        },
-      });
+      const cr = await changeRequestService.getChangeRequestForPublish(crId);
 
       if (!cr) {
         throw new AppError("Change request not found", 404);
@@ -373,21 +285,16 @@ router.put(
         );
         const nextVersion = currentVal ? currentVal.version + 1 : 1;
 
-        await prisma.translationValue.create({
-          data: {
-            keyId: item.keyId,
-            locale: item.locale,
-            value: item.newValue,
-            version: nextVersion,
-            updatedById: req.user!.id,
-          },
+        await keyService.createTranslationValue({
+          keyId: item.keyId,
+          locale: item.locale,
+          value: item.newValue,
+          version: nextVersion,
+          updatedById: req.user!.id,
         });
 
         // Update key status
-        const allValues = await prisma.translationValue.findMany({
-          where: { keyId: item.keyId },
-          orderBy: { version: "desc" },
-        });
+        const allValues = await keyService.getAllKeyValues(item.keyId);
         const latestByLocale: Record<string, string> = {};
         for (const v of allValues) {
           if (!latestByLocale[v.locale]) {
@@ -397,17 +304,14 @@ router.put(
         const hasTH = !!latestByLocale["TH"];
         const hasEN = !!latestByLocale["EN"];
 
-        await prisma.translationKey.update({
-          where: { id: item.keyId },
-          data: { status: hasTH && hasEN ? "TRANSLATED" : "PENDING" },
-        });
+        await keyService.setKeyStatus(
+          item.keyId,
+          hasTH && hasEN ? "TRANSLATED" : "PENDING"
+        );
       }
 
       // Mark CR as PUBLISHED
-      await prisma.changeRequest.update({
-        where: { id: crId },
-        data: { status: "PUBLISHED" },
-      });
+      await changeRequestService.markChangeRequestPublished(crId);
 
       await logAudit(
         AuditAction.CR_PUBLISHED,

@@ -1,9 +1,9 @@
 import { Router, Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { z } from "zod";
-import { prisma } from "@hato-tms/db";
 import { authMiddleware, generateToken, generateRefreshToken, verifyRefreshToken } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
+import * as authService from "../services/authService";
 
 const router = Router();
 
@@ -20,7 +20,7 @@ router.post(
     try {
       const { email } = loginSchema.parse(req.body);
 
-      const user = await prisma.user.findUnique({ where: { email } });
+      const user = await authService.getUserByEmail(email);
       if (!user) {
         throw new AppError("User not found", 404);
       }
@@ -58,10 +58,7 @@ router.post(
       const payload = verifyRefreshToken(refreshToken);
 
       // Verify user still exists and is active
-      const user = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: { id: true, email: true, isActive: true },
-      });
+      const user = await authService.getUserActiveById(payload.userId);
       if (!user || !user.isActive) {
         throw new AppError("User not found or deactivated", 401);
       }
@@ -90,10 +87,7 @@ router.get(
   authMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let user = await prisma.user.findUnique({
-        where: { id: req.user!.id },
-        select: { id: true, email: true, name: true, role: true, apiToken: true, createdAt: true },
-      });
+      let user = await authService.getUserById(req.user!.id);
       if (!user) {
         throw new AppError("User not found", 404);
       }
@@ -101,11 +95,7 @@ router.get(
       // Auto-generate API token if the user doesn't have one yet
       if (!user.apiToken) {
         const newToken = crypto.randomBytes(32).toString("hex");
-        user = await prisma.user.update({
-          where: { id: req.user!.id },
-          data: { apiToken: newToken },
-          select: { id: true, email: true, name: true, role: true, apiToken: true, createdAt: true },
-        });
+        user = await authService.setApiToken(req.user!.id, newToken);
       }
 
       res.json({ user });
@@ -123,10 +113,7 @@ router.post(
     try {
       const apiToken = crypto.randomBytes(32).toString("hex");
 
-      await prisma.user.update({
-        where: { id: req.user!.id },
-        data: { apiToken },
-      });
+      await authService.updateApiToken(req.user!.id, apiToken);
 
       res.status(201).json({ apiToken });
     } catch (err) {
@@ -143,10 +130,7 @@ router.post(
     try {
       const apiToken = crypto.randomBytes(32).toString("hex");
 
-      await prisma.user.update({
-        where: { id: req.user!.id },
-        data: { apiToken },
-      });
+      await authService.updateApiToken(req.user!.id, apiToken);
 
       res.json({ apiToken });
     } catch (err) {
@@ -161,10 +145,7 @@ router.get(
   authMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const users = await prisma.user.findMany({
-        select: { id: true, email: true, name: true, role: true },
-        orderBy: { name: "asc" },
-      });
+      const users = await authService.listAllUsers();
       res.json({ data: users });
     } catch (err) {
       next(err);
