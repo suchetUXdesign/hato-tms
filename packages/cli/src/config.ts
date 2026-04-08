@@ -67,7 +67,7 @@ const userConf = new Conf<UserConfig>({
 });
 
 export function getUserApiUrl(): string {
-  return userConf.get("apiUrl") || "http://localhost:4000";
+  return userConf.get("apiUrl") || "https://hato-tms-api.vercel.app";
 }
 
 export function getUserToken(): string {

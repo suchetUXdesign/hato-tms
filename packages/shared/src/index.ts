@@ -30,12 +30,12 @@ export enum UserRole {
 }
 
 export enum Platform {
-  HS = "hs",
-  HH = "hh",
-  LIFF = "liff",
-  MERCHANT = "merchant",
-  FLEX = "flex",
-  COMMON = "common",
+  HS = "HS",
+  HH = "HH",
+  LIFF = "LIFF",
+  MERCHANT = "MERCHANT",
+  FLEX = "FLEX",
+  COMMON = "COMMON",
 }
 
 export enum AuditAction {
@@ -118,6 +118,7 @@ export interface UserDTO {
   email: string;
   name: string;
   role: UserRole;
+  apiToken?: string;
 }
 
 export interface AuditLogDTO {
@@ -205,7 +206,7 @@ export interface PaginatedResponse<T> {
 
 // ---- Key Naming Validation ----
 
-export const KEY_NAME_REGEX = /^[a-z][a-zA-Z0-9]*$/;
+export const KEY_NAME_REGEX = /^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)*$/;
 export const NAMESPACE_PATH_REGEX = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/;
 
 export function validateKeyName(name: string): boolean {

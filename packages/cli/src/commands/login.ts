@@ -12,7 +12,7 @@ export async function loginCommand(): Promise<void> {
       type: "input",
       name: "apiUrl",
       message: "API URL:",
-      default: "http://localhost:4000",
+      default: "https://hato-tms-api.vercel.app",
       validate: (v: string) =>
         v.startsWith("http://") || v.startsWith("https://")
           ? true
@@ -24,22 +24,12 @@ export async function loginCommand(): Promise<void> {
       message: "Email:",
       validate: (v: string) => (v.includes("@") ? true : "Enter a valid email"),
     },
-    {
-      type: "password",
-      name: "password",
-      message: "Password:",
-      mask: "*",
-    },
   ]);
 
   const spinner = ora("Authenticating…").start();
 
   try {
-    const { token, user } = await login(
-      answers.apiUrl,
-      answers.email,
-      answers.password
-    );
+    const { token, user } = await login(answers.apiUrl, answers.email);
 
     setUserCredentials(answers.apiUrl, token);
     resetClient();
@@ -52,8 +42,10 @@ export async function loginCommand(): Promise<void> {
     );
   } catch (err: any) {
     spinner.fail(chalk.red("Login failed"));
-    if (err?.response?.status === 401) {
-      console.log(chalk.red("  Invalid email or password.\n"));
+    if (err?.response?.status === 404) {
+      console.log(chalk.red("  Email not found. Check your email address.\n"));
+    } else if (err?.response?.status === 401) {
+      console.log(chalk.red("  Unauthorized.\n"));
     } else {
       console.log(
         chalk.red(`  ${err?.message || "Could not reach the server."}\n`)

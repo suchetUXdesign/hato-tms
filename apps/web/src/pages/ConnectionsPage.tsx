@@ -26,6 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "../hooks/useTranslation";
+import { getMe } from "../services/api";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -68,12 +69,12 @@ jobs:
       - name: Pull TH
         run: |
           mkdir -p src/locales
-          curl -sf -H "X-API-Token: \${{ secrets.HATO_TMS_TOKEN }}" \\
+          curl -sf -H "X-API-Token: \${{ secrets.HATO_TMS_API_TOKEN }}" \\
             "\${{ secrets.HATO_TMS_URL }}/api/v1/import-export/export/json?locale=TH" \\
             -o src/locales/th.json
       - name: Pull EN
         run: |
-          curl -sf -H "X-API-Token: \${{ secrets.HATO_TMS_TOKEN }}" \\
+          curl -sf -H "X-API-Token: \${{ secrets.HATO_TMS_API_TOKEN }}" \\
             "\${{ secrets.HATO_TMS_URL }}/api/v1/import-export/export/json?locale=EN" \\
             -o src/locales/en.json
       - uses: peter-evans/create-pull-request@v6
@@ -82,7 +83,7 @@ jobs:
           branch: chore/sync-translations`;
 
 const cliConfigJson = `{
-  "apiUrl": "https://tms.hato.app",
+  "apiUrl": "https://hato-tms-api.vercel.app",
   "token": "",
   "namespaces": ["common", "dashboard"],
   "outputDir": "src/locales",
@@ -91,7 +92,7 @@ const cliConfigJson = `{
 }`;
 
 const cliOutputExample = `  Hato TMS Sync
-  API:        https://tms.hato.app
+  API:        https://hato-tms-api.vercel.app
   Namespaces: common, dashboard
   Output:     src/locales
 
@@ -102,15 +103,15 @@ const cliOutputExample = `  Hato TMS Sync
 
 const curlExamples = `# Get all translations as nested JSON (Thai)
 curl -H "X-API-Token: YOUR_TOKEN" \\
-  "https://tms.hato.app/api/v1/import-export/export/json?locale=TH"
+  "https://hato-tms-api.vercel.app/api/v1/import-export/export/json?locale=TH"
 
 # Get specific namespaces
 curl -H "X-API-Token: YOUR_TOKEN" \\
-  "https://tms.hato.app/api/v1/import-export/export/json?locale=EN&namespaces=common,dashboard"
+  "https://hato-tms-api.vercel.app/api/v1/import-export/export/json?locale=EN&namespaces=common,dashboard"
 
 # Flat format (for simple key-value)
 curl -H "X-API-Token: YOUR_TOKEN" \\
-  "https://tms.hato.app/api/v1/import-export/export/json?locale=TH&format=flat"`;
+  "https://hato-tms-api.vercel.app/api/v1/import-export/export/json?locale=TH&format=flat"`;
 
 const reactI18nextCode = `// src/i18n.ts
 import i18n from "i18next";
@@ -170,12 +171,12 @@ const secretsData = [
   {
     key: "1",
     secret: "HATO_TMS_URL",
-    value: "API base URL (e.g. https://tms.hato.app)",
+    value: "API base URL (e.g. https://hato-tms-api.vercel.app)",
   },
   {
     key: "2",
-    secret: "HATO_TMS_TOKEN",
-    value: "Your API token",
+    secret: "HATO_TMS_API_TOKEN",
+    value: "Your API token (copy from Quick Setup below)",
   },
 ];
 
@@ -300,10 +301,10 @@ function CLIContent() {
             description: (
               <div style={{ marginTop: 8 }}>
                 <Paragraph
-                  copyable={{ text: "npm install @hato-tms/cli -D" }}
+                  copyable={{ text: "npm install -g hato-tms" }}
                   style={{ marginBottom: 0 }}
                 >
-                  <pre style={codeBlockStyle}>npm install @hato-tms/cli -D</pre>
+                  <pre style={codeBlockStyle}>npm install -g hato-tms</pre>
                 </Paragraph>
               </div>
             ),
@@ -424,11 +425,7 @@ function QuickSetupCard() {
   const { t } = useTranslation();
   const { data: me } = useQuery({
     queryKey: ["me"],
-    queryFn: async () => {
-      const res = await fetch("/api/v1/auth/me", { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
+    queryFn: getMe,
     retry: false,
   });
 
