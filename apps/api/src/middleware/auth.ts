@@ -3,7 +3,10 @@ import jwt from "jsonwebtoken";
 import { prisma } from "@hato-tms/db";
 import { AppError } from "./errorHandler";
 
-const JWT_SECRET = process.env.JWT_SECRET || "hato-tms-dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("Missing required env var: JWT_SECRET");
+}
 
 export interface AuthUser {
   id: string;
