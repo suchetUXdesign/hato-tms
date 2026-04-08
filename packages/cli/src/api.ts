@@ -32,10 +32,9 @@ export function resetClient(): void {
 
 export async function login(
   apiUrl: string,
-  email: string,
-  password: string
+  email: string
 ): Promise<{ token: string; user: { id: string; name: string; email: string } }> {
-  const res = await axios.post(`${apiUrl}/api/auth/login`, { email, password });
+  const res = await axios.post(`${apiUrl}/api/v1/auth/login`, { email });
   return res.data;
 }
 
@@ -44,7 +43,7 @@ export async function login(
 export async function getKeys(
   params: SearchParams = {}
 ): Promise<PaginatedResponse<TranslationKeyDTO>> {
-  const res = await getClient().get("/api/keys", { params });
+  const res = await getClient().get("/api/v1/keys", { params });
   return res.data;
 }
 
@@ -81,11 +80,12 @@ export async function pushFile(
   format: "json" | "csv",
   data: string
 ): Promise<ImportPreview> {
-  const res = await getClient().post("/api/import/preview", {
-    namespacePath,
-    format,
-    data,
-  });
+  const endpoint = `/api/v1/import-export/import/${format}`;
+  const body =
+    format === "csv"
+      ? { namespacePath, data, confirm: false }
+      : { namespacePath, data: JSON.parse(data), confirm: false };
+  const res = await getClient().post(endpoint, body);
   return res.data;
 }
 
@@ -94,11 +94,12 @@ export async function confirmPush(
   format: "json" | "csv",
   data: string
 ): Promise<{ added: number; modified: number; removed: number }> {
-  const res = await getClient().post("/api/import", {
-    namespacePath,
-    format,
-    data,
-  });
+  const endpoint = `/api/v1/import-export/import/${format}`;
+  const body =
+    format === "csv"
+      ? { namespacePath, data, confirm: true }
+      : { namespacePath, data: JSON.parse(data), confirm: true };
+  const res = await getClient().post(endpoint, body);
   return res.data;
 }
 
@@ -107,9 +108,18 @@ export async function confirmPush(
 export async function exportNamespace(
   options: ExportOptions
 ): Promise<string> {
-  const res = await getClient().post("/api/export", options, {
-    responseType: "text",
-  });
+  const isCsv = options.format === "csv";
+  const endpoint = isCsv
+    ? "/api/v1/import-export/export/csv"
+    : "/api/v1/import-export/export/json";
+  const params: Record<string, string> = {
+    namespaces: options.namespacePaths.join(","),
+    format: isCsv ? "csv" : options.format === "json_flat" ? "flat" : "nested",
+  };
+  if (options.locales?.length) {
+    params.locale = options.locales[0].toUpperCase();
+  }
+  const res = await getClient().get(endpoint, { params, responseType: "text" });
   return res.data;
 }
 

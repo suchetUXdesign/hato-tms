@@ -363,26 +363,34 @@ export async function createNamespace(payload: {
 export async function importJSON(
   payload: ImportRequest,
 ): Promise<ImportPreview> {
-  const { data } = await api.post("/import/json", payload);
+  const { data } = await api.post("/import-export/import/json", payload);
   return data;
 }
 
 export async function importCSV(
   payload: ImportRequest,
 ): Promise<ImportPreview> {
-  const { data } = await api.post("/import/csv", payload);
+  const { data } = await api.post("/import-export/import/csv", payload);
   return data;
 }
 
 export async function exportJSON(params: ExportOptions): Promise<Blob> {
-  const { data } = await api.post("/export/json", params, {
+  const { data } = await api.get("/import-export/export/json", {
+    params: {
+      namespaces: params.namespacePaths?.join(","),
+      format: params.format === "json_flat" ? "flat" : "nested",
+      locale: params.locales?.[0]?.toUpperCase(),
+    },
     responseType: "blob",
   });
   return data;
 }
 
 export async function exportCSV(params: ExportOptions): Promise<Blob> {
-  const { data } = await api.post("/export/csv", params, {
+  const { data } = await api.get("/import-export/export/csv", {
+    params: {
+      namespaces: params.namespacePaths?.join(","),
+    },
     responseType: "blob",
   });
   return data;

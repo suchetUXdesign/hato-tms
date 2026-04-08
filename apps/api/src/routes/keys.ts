@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { prisma } from "@hato-tms/db";
 import {
   validateKeyName,
   validateNamespacePath,
@@ -11,6 +10,7 @@ import { authMiddleware } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditService";
 import * as cache from "../services/cacheService";
+import * as keyService from "../services/keyService";
 
 const router = Router();
 
@@ -74,47 +74,6 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     const size = Math.min(100, Math.max(1, parseInt(pageSize || "50", 10)));
     const skip = (pageNum - 1) * size;
 
-    // Build where clause
-    const where: any = {
-      deletedAt: null, // exclude soft-deleted
-    };
-
-    if (query) {
-      where.OR = [
-        { keyName: { contains: query, mode: "insensitive" } },
-        { description: { contains: query, mode: "insensitive" } },
-        {
-          values: {
-            some: { value: { contains: query, mode: "insensitive" } },
-          },
-        },
-        {
-          namespace: {
-            path: { contains: query, mode: "insensitive" },
-          },
-        },
-      ];
-    }
-
-    if (namespace) {
-      where.namespace = { path: { startsWith: namespace } };
-    }
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (platform) {
-      where.platforms = { has: platform };
-    }
-
-    if (tags) {
-      const tagList = typeof tags === "string" ? tags.split(",") : [];
-      if (tagList.length > 0) {
-        where.tags = { hasSome: tagList };
-      }
-    }
-
     // Build orderBy
     let orderBy: any;
     switch (sortBy) {
@@ -130,25 +89,16 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
         break;
     }
 
-    const [keys, total] = await Promise.all([
-      prisma.translationKey.findMany({
-        where,
-        include: {
-          namespace: { select: { path: true } },
-          values: {
-            where: {
-              // Get latest version per locale
-            },
-            orderBy: { version: "desc" },
-          },
-          createdBy: { select: { name: true } },
-        },
-        orderBy,
-        skip,
-        take: size,
-      }),
-      prisma.translationKey.count({ where }),
-    ]);
+    const { keys, total } = await keyService.listKeys({
+      query,
+      namespace,
+      status,
+      platform,
+      tags,
+      skip,
+      take: size,
+      orderBy,
+    });
 
     // Deduplicate values to latest version per locale
     const data = keys.map((key) => {
@@ -217,26 +167,13 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Auto-create namespace if needed
-    let ns = await prisma.namespace.findUnique({
-      where: { path: body.namespacePath },
-    });
+    let ns = await keyService.findNamespaceByPath(body.namespacePath);
     if (!ns) {
-      ns = await prisma.namespace.create({
-        data: {
-          path: body.namespacePath,
-          platforms: body.platforms,
-        },
-      });
+      ns = await keyService.createNamespace(body.namespacePath, body.platforms);
     }
 
     // Check for duplicate key in same namespace
-    const existing = await prisma.translationKey.findFirst({
-      where: {
-        namespaceId: ns.id,
-        keyName: body.keyName,
-        deletedAt: null,
-      },
-    });
+    const existing = await keyService.findExistingKey(ns.id, body.keyName);
     if (existing) {
       throw new AppError(
         "A key with this name already exists in this namespace.",
@@ -245,30 +182,19 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Determine initial status
-    const status =
-      body.thValue && body.enValue ? "TRANSLATED" : "PENDING";
+    const status = body.thValue && body.enValue ? "TRANSLATED" : "PENDING";
 
-    // Create key + values in transaction
-    const key = await prisma.translationKey.create({
-      data: {
-        namespaceId: ns.id,
-        keyName: body.keyName,
-        description: body.description ?? null,
-        tags: body.tags,
-        platforms: body.platforms,
-        status,
-        createdById: req.user!.id,
-        values: {
-          create: [
-            { locale: "TH", value: body.thValue, version: 1 },
-            { locale: "EN", value: body.enValue, version: 1 },
-          ],
-        },
-      },
-      include: {
-        namespace: { select: { path: true } },
-        values: true,
-      },
+    // Create key + values
+    const key = await keyService.createKeyWithValues({
+      namespaceId: ns.id,
+      keyName: body.keyName,
+      description: body.description ?? null,
+      tags: body.tags,
+      platforms: body.platforms,
+      status,
+      createdById: req.user!.id,
+      thValue: body.thValue,
+      enValue: body.enValue,
     });
 
     await logAudit(
@@ -319,17 +245,7 @@ router.get(
         throw new AppError("keyName query param is required", 400);
       }
 
-      // Find keys with similar names (contains match)
-      const similar = await prisma.translationKey.findMany({
-        where: {
-          deletedAt: null,
-          keyName: { contains: keyName, mode: "insensitive" },
-        },
-        include: {
-          namespace: { select: { path: true } },
-        },
-        take: 20,
-      });
+      const similar = await keyService.findSimilarKeys(keyName);
 
       res.json({
         candidates: similar.map((k) => ({
@@ -348,17 +264,7 @@ router.get(
 // ---- GET /:id — Get single key ----
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const key = await prisma.translationKey.findUnique({
-      where: { id: req.params.id },
-      include: {
-        namespace: { select: { id: true, path: true, description: true } },
-        values: {
-          orderBy: { version: "desc" },
-          include: { updatedBy: { select: { id: true, name: true, email: true } } },
-        },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const key = await keyService.getKeyById(req.params.id);
 
     if (!key || key.deletedAt) {
       throw new AppError("Key not found", 404);
@@ -417,25 +323,15 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     const body = updateKeySchema.parse(req.body);
     const keyId = req.params.id;
 
-    const existing = await prisma.translationKey.findUnique({
-      where: { id: keyId },
-    });
+    const existing = await keyService.getKeyForCheck(keyId);
     if (!existing || existing.deletedAt) {
       throw new AppError("Key not found", 404);
     }
 
-    const data: any = {};
-    if (body.description !== undefined) data.description = body.description;
-    if (body.tags !== undefined) data.tags = body.tags;
-    if (body.platforms !== undefined) data.platforms = body.platforms;
-
-    const updated = await prisma.translationKey.update({
-      where: { id: keyId },
-      data,
-      include: {
-        namespace: { select: { path: true } },
-        values: { orderBy: { version: "desc" } },
-      },
+    const updated = await keyService.updateKeyMetadata(keyId, {
+      description: body.description,
+      tags: body.tags,
+      platforms: body.platforms,
     });
 
     await logAudit(
@@ -481,10 +377,7 @@ router.put(
       const body = saveSchema.parse(req.body);
 
       // Load current key with latest values
-      const key = await prisma.translationKey.findUnique({
-        where: { id: keyId },
-        include: { values: { orderBy: { version: "desc" } } },
-      });
+      const key = await keyService.getKeyWithValues(keyId);
       if (!key || key.deletedAt) {
         throw new AppError("Key not found", 404);
       }
@@ -542,14 +435,12 @@ router.put(
           const current = locale === "TH" ? currentTH : currentEN;
           const nextVersion = current ? current.version + 1 : 1;
 
-          const newVal = await prisma.translationValue.create({
-            data: {
-              keyId,
-              locale,
-              value: change.to,
-              version: nextVersion,
-              updatedById: req.user!.id,
-            },
+          const newVal = await keyService.createTranslationValue({
+            keyId,
+            locale,
+            value: change.to,
+            version: nextVersion,
+            updatedById: req.user!.id,
           });
 
           valueResults.push({
@@ -565,17 +456,11 @@ router.put(
       // Update tags if changed
       const tagsChange = changes.find((c) => c.fieldPath === "tags");
       if (tagsChange) {
-        await prisma.translationKey.update({
-          where: { id: keyId },
-          data: { tags: tagsChange.to },
-        });
+        await keyService.updateKeyTags(keyId, tagsChange.to);
       }
 
       // Update key status based on values
-      const allValues = await prisma.translationValue.findMany({
-        where: { keyId },
-        orderBy: { version: "desc" },
-      });
+      const allValues = await keyService.getAllKeyValues(keyId);
       const latestByLocale: Record<string, string> = {};
       for (const v of allValues) {
         if (!latestByLocale[v.locale]) {
@@ -586,10 +471,7 @@ router.put(
       const hasEN = !!latestByLocale["EN"];
       const newStatus = hasTH && hasEN ? "TRANSLATED" : "PENDING";
 
-      await prisma.translationKey.update({
-        where: { id: keyId },
-        data: { status: newStatus },
-      });
+      await keyService.setKeyStatus(keyId, newStatus);
 
       // Store structured diff in audit log
       await logAudit(
@@ -617,16 +499,7 @@ router.get(
     try {
       const keyId = req.params.id;
 
-      const logs = await prisma.auditLog.findMany({
-        where: {
-          entityType: "TranslationKey",
-          entityId: keyId,
-          action: { in: ["key.updated", "key.created"] },
-        },
-        include: { actor: { select: { id: true, name: true, email: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      });
+      const logs = await keyService.getKeyHistory(keyId);
 
       const history = logs.map((log) => ({
         id: log.id,
@@ -652,10 +525,7 @@ router.put(
       const updates = updateValuesSchema.parse(req.body);
       const keyId = req.params.id;
 
-      const key = await prisma.translationKey.findUnique({
-        where: { id: keyId },
-        include: { values: { orderBy: { version: "desc" } } },
-      });
+      const key = await keyService.getKeyWithValues(keyId);
       if (!key || key.deletedAt) {
         throw new AppError("Key not found", 404);
       }
@@ -669,14 +539,12 @@ router.put(
         const oldValue = current?.value ?? null;
 
         // Create new version
-        const newVal = await prisma.translationValue.create({
-          data: {
-            keyId,
-            locale: upd.locale,
-            value: upd.value,
-            version: nextVersion,
-            updatedById: req.user!.id,
-          },
+        const newVal = await keyService.createTranslationValue({
+          keyId,
+          locale: upd.locale,
+          value: upd.value,
+          version: nextVersion,
+          updatedById: req.user!.id,
         });
 
         results.push({
@@ -704,10 +572,7 @@ router.put(
       }
 
       // Update key status based on values
-      const allValues = await prisma.translationValue.findMany({
-        where: { keyId },
-        orderBy: { version: "desc" },
-      });
+      const allValues = await keyService.getAllKeyValues(keyId);
 
       // Get latest per locale
       const latestByLocale: Record<string, string> = {};
@@ -721,10 +586,7 @@ router.put(
       const hasEN = !!latestByLocale["EN"];
       const newStatus = hasTH && hasEN ? "TRANSLATED" : "PENDING";
 
-      await prisma.translationKey.update({
-        where: { id: keyId },
-        data: { status: newStatus },
-      });
+      await keyService.setKeyStatus(keyId, newStatus);
 
       await cache.invalidatePattern("keys:*");
       await cache.invalidatePattern("coverage:*");
@@ -743,17 +605,12 @@ router.delete(
     try {
       const keyId = req.params.id;
 
-      const key = await prisma.translationKey.findUnique({
-        where: { id: keyId },
-      });
+      const key = await keyService.getKeyForCheck(keyId);
       if (!key || key.deletedAt) {
         throw new AppError("Key not found", 404);
       }
 
-      await prisma.translationKey.update({
-        where: { id: keyId },
-        data: { deletedAt: new Date() },
-      });
+      await keyService.softDeleteKey(keyId);
 
       await logAudit(
         AuditAction.KEY_DELETED,
@@ -781,9 +638,7 @@ router.post(
       const { operation, keyIds } = body;
 
       // Verify all keys exist
-      const keys = await prisma.translationKey.findMany({
-        where: { id: { in: keyIds }, deletedAt: null },
-      });
+      const keys = await keyService.findKeysByIds(keyIds);
       if (keys.length !== keyIds.length) {
         throw new AppError("Some keys not found", 404);
       }
@@ -793,18 +648,7 @@ router.post(
           if (!body.tags || body.tags.length === 0) {
             throw new AppError("tags required for tag operation", 400);
           }
-          await prisma.$transaction(
-            keyIds.map((id) =>
-              prisma.translationKey.update({
-                where: { id },
-                data: {
-                  tags: {
-                    push: body.tags!,
-                  },
-                },
-              })
-            )
-          );
+          await keyService.bulkTagKeys(keyIds, body.tags);
           res.json({ message: `Tags applied to ${keyIds.length} keys` });
           break;
         }
@@ -821,19 +665,12 @@ router.post(
           }
 
           // Auto-create target namespace
-          let targetNs = await prisma.namespace.findUnique({
-            where: { path: body.targetNamespacePath },
-          });
+          let targetNs = await keyService.findNamespaceByPath(body.targetNamespacePath);
           if (!targetNs) {
-            targetNs = await prisma.namespace.create({
-              data: { path: body.targetNamespacePath },
-            });
+            targetNs = await keyService.createNamespace(body.targetNamespacePath);
           }
 
-          await prisma.translationKey.updateMany({
-            where: { id: { in: keyIds } },
-            data: { namespaceId: targetNs.id },
-          });
+          await keyService.bulkMoveKeys(keyIds, targetNs.id);
 
           res.json({
             message: `${keyIds.length} keys moved to ${body.targetNamespacePath}`,
@@ -842,10 +679,7 @@ router.post(
         }
 
         case "delete": {
-          await prisma.translationKey.updateMany({
-            where: { id: { in: keyIds } },
-            data: { deletedAt: new Date() },
-          });
+          await keyService.bulkSoftDeleteKeys(keyIds);
 
           for (const id of keyIds) {
             await logAudit(

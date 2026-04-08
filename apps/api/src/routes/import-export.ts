@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { prisma } from "@hato-tms/db";
 import {
   validateKeyName,
   validateNamespacePath,
@@ -11,6 +10,7 @@ import { authMiddleware } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditService";
 import * as cache from "../services/cacheService";
+import * as importExportService from "../services/importExportService";
 
 const router = Router();
 
@@ -106,16 +106,11 @@ router.post(
       const flat = flattenJson(body.data);
 
       // Get or create namespace
-      let ns = await prisma.namespace.findUnique({
-        where: { path: body.namespacePath },
-      });
+      let ns = await importExportService.getNamespaceByPath(body.namespacePath);
 
       // Get existing keys in this namespace
       const existingKeys = ns
-        ? await prisma.translationKey.findMany({
-            where: { namespaceId: ns.id, deletedAt: null },
-            include: { values: { orderBy: { version: "desc" } } },
-          })
+        ? await importExportService.getKeysForImport(ns.id)
         : [];
 
       const existingMap = new Map<string, (typeof existingKeys)[0]>();
@@ -185,9 +180,7 @@ router.post(
 
       // Apply changes
       if (!ns) {
-        ns = await prisma.namespace.create({
-          data: { path: body.namespacePath },
-        });
+        ns = await importExportService.createNamespace(body.namespacePath);
       }
 
       let createdCount = 0;
@@ -196,16 +189,12 @@ router.post(
       for (const item of added) {
         if (!validateKeyName(item.key)) continue; // skip invalid key names
 
-        await prisma.translationKey.create({
-          data: {
-            namespaceId: ns.id,
-            keyName: item.key,
-            status: "PENDING",
-            createdById: req.user!.id,
-            values: {
-              create: [{ locale, value: item.value, version: 1 }],
-            },
-          },
+        await importExportService.createImportKey({
+          namespaceId: ns.id,
+          keyName: item.key,
+          status: "PENDING",
+          createdById: req.user!.id,
+          values: [{ locale, value: item.value, version: 1 }],
         });
         createdCount++;
       }
@@ -217,14 +206,12 @@ router.post(
         );
         const nextVersion = currentVal ? currentVal.version + 1 : 1;
 
-        await prisma.translationValue.create({
-          data: {
-            keyId: existing.id,
-            locale,
-            value: item.newValue,
-            version: nextVersion,
-            updatedById: req.user!.id,
-          },
+        await importExportService.createImportValue({
+          keyId: existing.id,
+          locale,
+          value: item.newValue,
+          version: nextVersion,
+          updatedById: req.user!.id,
         });
         updatedCount++;
       }
@@ -297,15 +284,10 @@ router.post(
       }
 
       // Get or create namespace
-      let ns = await prisma.namespace.findUnique({
-        where: { path: body.namespacePath },
-      });
+      let ns = await importExportService.getNamespaceByPath(body.namespacePath);
 
       const existingKeys = ns
-        ? await prisma.translationKey.findMany({
-            where: { namespaceId: ns.id, deletedAt: null },
-            include: { values: { orderBy: { version: "desc" } } },
-          })
+        ? await importExportService.getKeysForImport(ns.id)
         : [];
 
       const existingMap = new Map<string, (typeof existingKeys)[0]>();
@@ -380,9 +362,7 @@ router.post(
 
       // Apply changes
       if (!ns) {
-        ns = await prisma.namespace.create({
-          data: { path: body.namespacePath },
-        });
+        ns = await importExportService.createNamespace(body.namespacePath);
       }
 
       let createdCount = 0;
@@ -392,18 +372,16 @@ router.post(
         if (!validateKeyName(item.key)) continue;
 
         const status = item.th && item.en ? "TRANSLATED" : "PENDING";
-        const valuesToCreate = [];
-        if (item.th) valuesToCreate.push({ locale: "TH" as const, value: item.th, version: 1 });
-        if (item.en) valuesToCreate.push({ locale: "EN" as const, value: item.en, version: 1 });
+        const values: Array<{ locale: "TH" | "EN"; value: string; version: number }> = [];
+        if (item.th) values.push({ locale: "TH", value: item.th, version: 1 });
+        if (item.en) values.push({ locale: "EN", value: item.en, version: 1 });
 
-        await prisma.translationKey.create({
-          data: {
-            namespaceId: ns.id,
-            keyName: item.key,
-            status,
-            createdById: req.user!.id,
-            values: { create: valuesToCreate },
-          },
+        await importExportService.createImportKey({
+          namespaceId: ns.id,
+          keyName: item.key,
+          status,
+          createdById: req.user!.id,
+          values,
         });
         createdCount++;
       }
@@ -415,14 +393,12 @@ router.post(
         );
         const nextVersion = currentVal ? currentVal.version + 1 : 1;
 
-        await prisma.translationValue.create({
-          data: {
-            keyId: existing.id,
-            locale: item.locale as "TH" | "EN",
-            value: item.newValue,
-            version: nextVersion,
-            updatedById: req.user!.id,
-          },
+        await importExportService.createImportValue({
+          keyId: existing.id,
+          locale: item.locale as "TH" | "EN",
+          value: item.newValue,
+          version: nextVersion,
+          updatedById: req.user!.id,
         });
         updatedCount++;
       }
@@ -465,23 +441,11 @@ router.get(
         locale?: string;
       };
 
-      const where: any = { deletedAt: null };
-      if (nsParam) {
-        const nsPaths = nsParam.split(",").map((s) => s.trim());
-        where.namespace = { path: { in: nsPaths } };
-      }
+      const namespacePaths = nsParam
+        ? nsParam.split(",").map((s) => s.trim())
+        : undefined;
 
-      const keys = await prisma.translationKey.findMany({
-        where,
-        include: {
-          namespace: { select: { path: true } },
-          values: { orderBy: { version: "desc" } },
-        },
-        orderBy: [
-          { namespace: { path: "asc" } },
-          { keyName: "asc" },
-        ],
-      });
+      const keys = await importExportService.getKeysForExport({ namespacePaths });
 
       // Build flat map per locale
       const locales = locale
@@ -560,23 +524,11 @@ router.get(
         namespaces?: string;
       };
 
-      const where: any = { deletedAt: null };
-      if (nsParam) {
-        const nsPaths = nsParam.split(",").map((s) => s.trim());
-        where.namespace = { path: { in: nsPaths } };
-      }
+      const namespacePaths = nsParam
+        ? nsParam.split(",").map((s) => s.trim())
+        : undefined;
 
-      const keys = await prisma.translationKey.findMany({
-        where,
-        include: {
-          namespace: { select: { path: true } },
-          values: { orderBy: { version: "desc" } },
-        },
-        orderBy: [
-          { namespace: { path: "asc" } },
-          { keyName: "asc" },
-        ],
-      });
+      const keys = await importExportService.getKeysForExport({ namespacePaths });
 
       // Build CSV
       const lines: string[] = ['"key","TH","EN","description"'];

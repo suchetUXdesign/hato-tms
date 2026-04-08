@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { prisma } from "@hato-tms/db";
 import { authMiddleware } from "../middleware/auth";
+import * as coverageService from "../services/coverageService";
 
 const router = Router();
 
@@ -9,18 +9,7 @@ router.use(authMiddleware);
 // ---- GET / — Coverage stats per namespace ----
 router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const namespaces = await prisma.namespace.findMany({
-      where: { isActive: true },
-      include: {
-        keys: {
-          where: { deletedAt: null },
-          include: {
-            values: { orderBy: { version: "desc" } },
-          },
-        },
-      },
-      orderBy: { path: "asc" },
-    });
+    const namespaces = await coverageService.getNamespacesWithKeys();
 
     const stats = namespaces.map((ns) => {
       const totalKeys = ns.keys.length;
@@ -96,22 +85,7 @@ router.get(
         locale?: string;
       };
 
-      const where: any = { deletedAt: null };
-      if (namespace) {
-        where.namespace = { path: { startsWith: namespace } };
-      }
-
-      const keys = await prisma.translationKey.findMany({
-        where,
-        include: {
-          namespace: { select: { path: true } },
-          values: { orderBy: { version: "desc" } },
-        },
-        orderBy: [
-          { namespace: { path: "asc" } },
-          { keyName: "asc" },
-        ],
-      });
+      const keys = await coverageService.getMissingKeys({ namespace, locale });
 
       const missing: Array<{
         id: string;

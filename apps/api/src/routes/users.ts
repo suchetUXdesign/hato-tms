@@ -1,9 +1,9 @@
 import { Router, Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { z } from "zod";
-import { prisma } from "@hato-tms/db";
 import { authMiddleware, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
+import * as userService from "../services/userService";
 
 const router = Router();
 
@@ -31,31 +31,9 @@ router.get(
     try {
       const { search, role } = req.query;
 
-      const where: any = {};
-
-      if (search && typeof search === "string") {
-        where.OR = [
-          { name: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-        ];
-      }
-
-      if (role && typeof role === "string") {
-        where.role = role;
-      }
-
-      const users = await prisma.user.findMany({
-        where,
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: [{ role: "asc" }, { name: "asc" }],
+      const users = await userService.listUsers({
+        search: typeof search === "string" ? search : undefined,
+        role: typeof role === "string" ? role : undefined,
       });
 
       res.json({ data: users });
@@ -73,28 +51,16 @@ router.post(
       const body = inviteSchema.parse(req.body);
 
       // Check if user already exists
-      const existing = await prisma.user.findUnique({
-        where: { email: body.email.toLowerCase() },
-      });
+      const existing = await userService.getUserByEmail(body.email.toLowerCase());
       if (existing) {
         throw new AppError("A user with this email already exists", 409);
       }
 
-      const user = await prisma.user.create({
-        data: {
-          email: body.email.toLowerCase(),
-          name: body.name,
-          role: body.role as any,
-          apiToken: crypto.randomBytes(32).toString("hex"),
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-        },
+      const user = await userService.createUser({
+        email: body.email.toLowerCase(),
+        name: body.name,
+        role: body.role,
+        apiToken: crypto.randomBytes(32).toString("hex"),
       });
 
       res.status(201).json({ data: user });
@@ -122,22 +88,10 @@ router.put(
         throw new AppError("You cannot deactivate your own account", 400);
       }
 
-      const user = await prisma.user.update({
-        where: { id },
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.role !== undefined && { role: body.role as any }),
-          ...(body.isActive !== undefined && { isActive: body.isActive }),
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      const user = await userService.updateUser(id, {
+        name: body.name,
+        role: body.role,
+        isActive: body.isActive,
       });
 
       res.json({ data: user });
@@ -158,17 +112,7 @@ router.delete(
         throw new AppError("You cannot deactivate your own account", 400);
       }
 
-      const user = await prisma.user.update({
-        where: { id },
-        data: { isActive: false },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          isActive: true,
-        },
-      });
+      const user = await userService.deactivateUser(id);
 
       res.json({ data: user, message: "User deactivated" });
     } catch (err) {

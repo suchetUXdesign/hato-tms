@@ -3,8 +3,10 @@ dist/
 .turbo/
 *.env
 *.env.local
+*.env.vercel
 .DS_Store
 .claude/
 *.log
 coverage/
 .next/
+.vercel

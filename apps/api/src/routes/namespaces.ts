@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { prisma } from "@hato-tms/db";
 import { validateNamespacePath, buildFullKey, AuditAction } from "@hato-tms/shared";
 import { authMiddleware } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditService";
+import * as namespaceService from "../services/namespaceService";
 
 const router = Router();
 
@@ -31,17 +31,7 @@ const updateNamespaceSchema = z.object({
 // ---- GET / — List all namespaces with key counts ----
 router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const namespaces = await prisma.namespace.findMany({
-      where: { isActive: true },
-      include: {
-        _count: {
-          select: {
-            keys: { where: { deletedAt: null } },
-          },
-        },
-      },
-      orderBy: { path: "asc" },
-    });
+    const namespaces = await namespaceService.listNamespaces();
 
     res.json({
       data: namespaces.map((ns) => ({
@@ -72,19 +62,15 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Check for existing
-    const existing = await prisma.namespace.findUnique({
-      where: { path: body.path },
-    });
+    const existing = await namespaceService.getNamespaceByPath(body.path);
     if (existing) {
       throw new AppError("Namespace already exists", 409);
     }
 
-    const ns = await prisma.namespace.create({
-      data: {
-        path: body.path,
-        description: body.description ?? null,
-        platforms: body.platforms,
-      },
+    const ns = await namespaceService.createNamespace({
+      path: body.path,
+      description: body.description,
+      platforms: body.platforms,
     });
 
     await logAudit(
@@ -115,9 +101,7 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     const body = updateNamespaceSchema.parse(req.body);
     const nsId = req.params.id;
 
-    const existing = await prisma.namespace.findUnique({
-      where: { id: nsId },
-    });
+    const existing = await namespaceService.getNamespaceById(nsId);
     if (!existing) {
       throw new AppError("Namespace not found", 404);
     }
@@ -128,27 +112,16 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
       }
 
       // Check for conflict
-      const conflict = await prisma.namespace.findUnique({
-        where: { path: body.path },
-      });
+      const conflict = await namespaceService.getNamespaceByPath(body.path);
       if (conflict) {
         throw new AppError("A namespace with this path already exists", 409);
       }
     }
 
-    const data: any = {};
-    if (body.path !== undefined) data.path = body.path;
-    if (body.description !== undefined) data.description = body.description;
-    if (body.platforms !== undefined) data.platforms = body.platforms;
-
-    const updated = await prisma.namespace.update({
-      where: { id: nsId },
-      data,
-      include: {
-        _count: {
-          select: { keys: { where: { deletedAt: null } } },
-        },
-      },
+    const updated = await namespaceService.updateNamespace(nsId, {
+      path: body.path,
+      description: body.description,
+      platforms: body.platforms,
     });
 
     await logAudit(
@@ -180,20 +153,12 @@ router.get(
     try {
       const nsId = req.params.id;
 
-      const ns = await prisma.namespace.findUnique({
-        where: { id: nsId },
-      });
+      const ns = await namespaceService.getNamespaceById(nsId);
       if (!ns) {
         throw new AppError("Namespace not found", 404);
       }
 
-      const keys = await prisma.translationKey.findMany({
-        where: { namespaceId: nsId, deletedAt: null },
-        include: {
-          values: { orderBy: { version: "desc" } },
-        },
-        orderBy: { keyName: "asc" },
-      });
+      const keys = await namespaceService.getKeysInNamespace(nsId);
 
       const data = keys.map((key) => {
         const latestValues: Record<string, (typeof key.values)[0]> = {};

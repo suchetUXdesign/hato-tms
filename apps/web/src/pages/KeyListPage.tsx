@@ -290,7 +290,7 @@ export default function KeyListPage() {
           style={{ width: 140 }}
           options={Object.values(Platform).map((p) => ({
             value: p,
-            label: p.toUpperCase(),
+            label: p,
           }))}
         />
         <Select

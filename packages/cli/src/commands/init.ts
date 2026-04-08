@@ -40,7 +40,7 @@ export async function initCommand(): Promise<void> {
       type: "input",
       name: "apiUrl",
       message: "Hato TMS API URL:",
-      default: "https://tms.hato.app",
+      default: "https://hato-tms-api.vercel.app",
       validate: (v: string) =>
         v.startsWith("http") ? true : "Must be a valid URL starting with http(s)",
     },
