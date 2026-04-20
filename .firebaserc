@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "hato-tms-dev",
+    "production": "hato-tms-prod"
+  }
+}
