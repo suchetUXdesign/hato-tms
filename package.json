@@ -18,10 +18,16 @@
     "db:studio": "npm -w @hato-tms/db run studio"
   },
   "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "esbuild": "^0.24.0",
     "prisma": "^6.3.0",
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
   },
-  "packageManager": "npm@10.2.0"
+  "packageManager": "npm@10.2.0",
+  "overrides": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
 }
