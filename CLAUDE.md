@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Hato TMS — AI Context File
 
 > Read this file before touching any code. It covers everything you need to vibe code immediately.
@@ -43,12 +47,26 @@ A **Translation Management System** for Hato Hub (Thai fintech). It manages TH/E
 │   │           ├── auditService.ts  # logAudit() helper
 │   │           └── cacheService.ts  # Redis TTL cache (graceful no-op if unavailable)
 │   │
-│   ├── web/               # React 18 + Vite + Ant Design 5 — SPA
+│   ├── web/               # React 18 + Vite + Ant Design 5 — SPA (legacy, being replaced)
 │   │   └── src/
 │   │       ├── pages/     # One file per page/drawer
 │   │       ├── services/
 │   │       │   └── api.ts # All API calls (axios), token management, auto-refresh
 │   │       └── main.tsx
+│   │
+│   ├── web-v2/            # React 19 + Vite + Tailwind v4 + shadcn/ui — Firebase-backed SPA
+│   │   └── src/
+│   │       ├── app/
+│   │       │   ├── router.tsx          # TanStack Router route tree
+│   │       │   ├── layouts/            # RootLayout wrapping app routes
+│   │       │   └── providers/          # AuthProvider (Firebase Auth), QueryProvider
+│   │       ├── features/               # Feature-sliced: one folder per domain feature
+│   │       │   └── auth/ui/LoginForm.tsx
+│   │       ├── pages/                  # Page components imported by router
+│   │       └── shared/
+│   │           ├── config/firebase.ts  # Firebase app init (reads VITE_FIREBASE_* env vars)
+│   │           ├── lib/utils.ts        # cn() Tailwind merge helper
+│   │           └── ui/                 # shadcn/ui component wrappers
 │   │
 │   └── figma-plugin/      # Figma Plugin (esbuild) — reads keys via X-API-Token
 │
@@ -60,7 +78,7 @@ A **Translation Management System** for Hato Hub (Thai fintech). It manages TH/E
 │   └── cli/              # hato-tms CLI (Commander.js) — push/pull keys via API
 │
 ├── .env.example          # All required env vars documented here
-├── MIGRATION.md          # Firebase migration plan (future work)
+├── MIGRATION.md          # Firebase migration plan — read this before working on web-v2
 └── docker-compose.yml    # PostgreSQL + Redis for local dev
 ```
 
@@ -68,6 +86,7 @@ A **Translation Management System** for Hato Hub (Thai fintech). It manages TH/E
 
 ## Tech Stack (exact versions)
 
+### `apps/api`
 | Layer | Tech | Version |
 |---|---|---|
 | Runtime | Node.js | ≥ 18 |
@@ -76,15 +95,36 @@ A **Translation Management System** for Hato Hub (Thai fintech). It manages TH/E
 | Database | PostgreSQL (Supabase hosted in prod) | - |
 | Cache | Redis via ioredis | 5.4 |
 | Auth | JWT (jsonwebtoken) | 9.0 |
-| API types | zod | 3.24 |
+| Validation | zod | 3.24 |
+| Build | tsx watch (dev), tsc (prod) | - |
+| Test | Vitest | 2.0 |
+
+### `apps/web` (legacy)
+| Layer | Tech | Version |
+|---|---|---|
 | Frontend | React | 18.3 |
 | UI library | Ant Design | 5.22 |
 | Data fetching | TanStack React Query | 5.62 |
 | Router | React Router | 7.1 |
-| Build (web) | Vite | 6 |
-| Build (API) | tsx watch (dev), tsc (prod) | - |
-| Test | Vitest | 2.0 |
+| Build | Vite | 6 |
+
+### `apps/web-v2` (active — Firebase migration target)
+| Layer | Tech | Version |
+|---|---|---|
+| Frontend | React | 19 |
+| UI library | shadcn/ui + Radix UI primitives | - |
+| Styling | Tailwind CSS | 4.x |
+| Auth | Firebase Auth | 11.x |
+| Data fetching | TanStack React Query | 5.62 |
+| Router | TanStack Router | 1.x |
+| Forms/validation | valibot | 1.0 |
+| Build | Vite | 6 |
+
+### Shared
+| Layer | Tech | Version |
+|---|---|---|
 | Package manager | npm workspaces | npm 10.2 |
+| Monorepo runner | Turborepo | 2.x |
 
 ---
 
@@ -104,8 +144,22 @@ npm run db:seed
 # 4. Start API (port 4000)
 npm run dev:api
 
-# 5. Start web (port 3000, proxies /api → :4000)
+# 5. Start legacy web (port 3000, proxies /api → :4000)
 npm run dev:web
+
+# 6. Start web-v2 (port 3001) — Firebase-backed rewrite
+npm -w @hato-tms/web-v2 run dev
+```
+
+**Lint / type-check:**
+```bash
+npm run lint           # runs tsc --noEmit across all workspaces via Turborepo
+npm -w @hato-tms/web-v2 run lint  # type-check web-v2 only
+```
+
+**Run tests (Vitest — no test files exist yet):**
+```bash
+npm -w @hato-tms/api run test
 ```
 
 **Required `.env` file at `apps/api/.env`:**
@@ -118,7 +172,17 @@ PORT=4000
 NODE_ENV=development
 ```
 
-> If Redis is unavailable, the app continues without caching — it degrades gracefully.
+**Required `.env` file at `apps/web-v2/.env` (copy from `.env.example`):**
+```
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+```
+
+> If Redis is unavailable, the API continues without caching — it degrades gracefully.
 > `JWT_SECRET` is required at startup; the API will throw and refuse to start without it.
 
 ---
@@ -316,6 +380,20 @@ Frontend data fetching: TanStack React Query. All API calls go through `apps/web
 
 ---
 
+## `web-v2` Conventions
+
+**Routing:** TanStack Router with a code-first route tree (no file-based routing). All routes are defined in `src/app/router.tsx`. The `appLayoutRoute` (`id: '_app'`) wraps authenticated pages inside `RootLayout`; `loginRoute` is outside it.
+
+**Auth:** `AuthProvider` wraps the app and exposes `useAuth()`. Firebase `onAuthStateChanged` drives `user` + `loading` state. The `user` object is a raw Firebase `User` — extract `user.uid` as the user ID when calling the API.
+
+**UI components:** Use `shadcn/ui`. Add new components with `npx shadcn add <component>` from inside `apps/web-v2/`. Components land in `src/shared/ui/`. The `cn()` utility is at `src/shared/lib/utils.ts`.
+
+**API calls:** Connect to the same `apps/api` backend as `apps/web`. Attach the Firebase ID token via `await user.getIdToken()` on each request (Firebase handles token refresh automatically — no manual refresh scheduling needed, unlike `apps/web`).
+
+**Styling:** Tailwind CSS v4 (PostCSS-free, loaded via `@tailwindcss/vite` Vite plugin). Config is inline in `src/index.css` (`@import "tailwindcss"`). No `tailwind.config.js` file.
+
+---
+
 ## Shared Package (`@hato-tms/shared`)
 
 Key exports from `packages/shared/src/index.ts`:
@@ -348,7 +426,7 @@ Key exports from `packages/shared/src/index.ts`:
 
 ---
 
-## Current State (as of 2026-04-08)
+## Current State (as of 2026-05-19)
 
 ### Done ✅
 - Full Express API with all 7 resource types
@@ -358,7 +436,7 @@ Key exports from `packages/shared/src/index.ts`:
 - Soft delete on TranslationKeys
 - Audit logging on all mutations
 - Redis caching with graceful no-op fallback
-- React web UI with all pages
+- React web UI (`apps/web`) with all pages
 - Figma plugin
 - CLI (`hato-tms push/pull`)
 - Import/Export (JSON nested, JSON flat, CSV)
@@ -366,6 +444,16 @@ Key exports from `packages/shared/src/index.ts`:
 - Coverage stats + missing key report
 - Vitest configured (no test files yet)
 - Firebase migration plan documented in `MIGRATION.md`
+- `apps/web-v2` scaffolded: React 19 + TanStack Router + Tailwind v4 + shadcn/ui + Firebase Auth
+
+### `web-v2` Status (Firebase rewrite — in progress)
+The new frontend (`apps/web-v2`) is being built as part of the Firebase migration. Current state:
+- Router, providers (AuthProvider, QueryProvider), and RootLayout are wired up
+- Firebase Auth (email/password via `signInWithEmailAndPassword`) is working in `AuthProvider`
+- Route tree mirrors `apps/web`: `/keys`, `/change-requests`, `/coverage`, `/import-export`, `/users`
+- Page stubs exist but are not yet implemented
+
+**Architecture in `web-v2`:** Feature-Sliced Design (FSD) — `app/` → `features/` → `pages/` → `shared/`. UI components come from shadcn/ui (`npx shadcn add <component>`), which puts them in `src/shared/ui/`.
 
 ### Pending / Known Gaps
 - **No test files exist yet** — Vitest is installed but `src/**/*.test.ts` is empty
@@ -394,3 +482,7 @@ Key exports from `packages/shared/src/index.ts`:
 7. **`keys.ts` route is the biggest file** — handles list with complex filtering, create, get, update metadata, update values, bulk operations, and history. Read it fully before touching it.
 
 8. **No migrations in CI** — Migrations are manual. Run `npx prisma migrate dev --schema packages/db/prisma/schema.prisma` locally.
+
+9. **`web-v2` has its own `node_modules`** — it is not hoisted to the root workspace because it uses React 19 while `apps/web` uses React 18. Run `npm install` from the repo root; the workspace handles it. If you get React version errors, ensure you're importing from `apps/web-v2/node_modules`, not the root.
+
+10. **Firebase migration is phased** — `MIGRATION.md` documents the full plan. `web-v2` is Phase 2 (auth) + Phase 4 (hosting) in progress. The API (`apps/api`) still uses Prisma + PostgreSQL until Phase 3 service files are swapped. Do not remove Prisma from the API until all service files are migrated.
