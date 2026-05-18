@@ -1,13 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import type { NamespaceDTO } from '@hato-tms/shared'
-import { apiClient } from '@/shared/api/client'
+import { getNamespaces } from '@/shared/api/keys'
 
 export function useNamespaces() {
   return useQuery({
     queryKey: ['namespaces'],
-    queryFn: async () => {
-      const { data } = await apiClient.get<NamespaceDTO[]>('/namespaces')
-      return data
-    },
+    queryFn: getNamespaces,
   })
 }
