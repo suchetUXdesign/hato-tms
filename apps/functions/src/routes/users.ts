@@ -40,14 +40,14 @@ router.put('/:uid', requireRole('ADMIN'), async (req, res, next) => {
       throw new AppError('Cannot change your own role', 403)
     }
     const data = v.parse(UpdateUserSchema, req.body)
-    res.json(await getUserRepository().update(req.params.uid, data))
+    res.json(await getUserRepository().update(req.params.uid as string, data))
   } catch (err) { next(err) }
 })
 
 router.delete('/:uid', requireRole('ADMIN'), async (req, res, next) => {
   try {
     if (req.params.uid === req.user.id) throw new AppError('Cannot deactivate yourself', 403)
-    res.json(await getUserRepository().deactivate(req.params.uid))
+    res.json(await getUserRepository().deactivate(req.params.uid as string))
   } catch (err) { next(err) }
 })
 

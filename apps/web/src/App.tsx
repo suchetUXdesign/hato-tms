@@ -575,8 +575,9 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const devBypass = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
   const token = localStorage.getItem("hato_token");
-  if (!token) {
+  if (!devBypass && !token) {
     return <Navigate to="/login" replace />;
   }
   return <AuthLayout>{children}</AuthLayout>;

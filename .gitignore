@@ -1,4 +1,14 @@
 node_modules/
+
+# TypeScript build artifacts
+*.tsbuildinfo
+vite.config.d.ts
+
+# Yarn Berry
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
 dist/
 .turbo/
 *.env

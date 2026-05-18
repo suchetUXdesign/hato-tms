@@ -63,7 +63,7 @@ export default function KeyListPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   // Debounce search
-  const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout>>();
+  const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const handleSearchChange = useCallback((value: string) => {
     setSearchQuery(value);
     clearTimeout(debounceTimerRef.current);

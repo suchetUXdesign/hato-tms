@@ -1,7 +1,9 @@
 {
-  "name": "hato-tms",
+  "name": "@hato-tms/cli",
   "version": "1.0.0",
-  "bin": { "hato-tms": "./dist/index.js" },
+  "bin": {
+    "hato-tms": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts"

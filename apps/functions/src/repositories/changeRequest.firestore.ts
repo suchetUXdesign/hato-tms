@@ -51,7 +51,7 @@ export class FirestoreChangeRequestRepository implements IChangeRequestRepositor
     const updatedReviewers = cr.reviewers.map((r) =>
       r.id === reviewerId ? { ...r, approved: input.action === 'approve' } : r,
     )
-    let newStatus = cr.status
+    let newStatus: CRStatus = cr.status
     if (input.action === 'reject') {
       newStatus = CRStatus.REJECTED
     } else if (input.action === 'approve' && updatedReviewers.every((r) => r.approved)) {

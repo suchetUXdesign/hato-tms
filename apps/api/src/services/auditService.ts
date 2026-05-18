@@ -1,4 +1,4 @@
-import { prisma } from "@hato-tms/db";
+import { prisma, Prisma } from "@hato-tms/db";
 
 /**
  * Log an audit trail entry.
@@ -17,7 +17,7 @@ export async function logAudit(
         entityType,
         entityId,
         actorId,
-        diff: diff ?? undefined,
+        diff: diff as Prisma.InputJsonValue ?? undefined,
       },
     });
   } catch (err) {

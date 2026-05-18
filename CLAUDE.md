@@ -89,7 +89,7 @@ A **Translation Management System** for Hato Hub (Thai fintech). It manages TH/E
 ### `apps/api`
 | Layer | Tech | Version |
 |---|---|---|
-| Runtime | Node.js | ≥ 18 |
+| Runtime | Node.js | ≥ 22 |
 | API framework | Express | 4.21 |
 | ORM | Prisma | 6.3 |
 | Database | PostgreSQL (Supabase hosted in prod) | - |
