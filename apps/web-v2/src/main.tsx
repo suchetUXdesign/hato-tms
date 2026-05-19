@@ -8,15 +8,24 @@ import { AuthProvider }     from '@/app/providers/AuthProvider'
 import { QueryProvider }    from '@/app/providers/QueryProvider'
 import { LocaleProvider }   from '@/shared/lib/useTranslation'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <LocaleProvider>
-      <QueryProvider>
-        <AuthProvider>
-          <RouterProvider router={router} />
-          <Toaster richColors position="top-right" />
-        </AuthProvider>
-      </QueryProvider>
-    </LocaleProvider>
-  </StrictMode>,
-)
+async function prepare() {
+  if (import.meta.env.DEV && !import.meta.env.VITE_FIREBASE_API_KEY) {
+    const { worker } = await import('./mocks/browser')
+    return worker.start({ onUnhandledRequest: 'bypass' })
+  }
+}
+
+prepare().then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <LocaleProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <RouterProvider router={router} />
+            <Toaster richColors position="top-right" />
+          </AuthProvider>
+        </QueryProvider>
+      </LocaleProvider>
+    </StrictMode>,
+  )
+})
