@@ -5,6 +5,7 @@ import { useKeys, useDeleteKey } from '@/entities/translation-key/api/useKeys'
 import { useNamespaces } from '@/entities/namespace/api/useNamespaces'
 import { useTranslation } from '@/shared/lib/useTranslation'
 import { CreateKeyDialog } from '@/features/create-key/ui/CreateKeyDialog'
+import { CreateCRDialog } from '@/features/create-change-request/ui/CreateCRDialog'
 import { KeyDetailSheet } from '@/widgets/key-detail'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -56,6 +57,8 @@ export function KeysPage() {
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null)
   const [sheetOpen,     setSheetOpen]     = useState(false)
   const [selectedIds,   setSelectedIds]   = useState<Set<string>>(new Set())
+  const [createCROpen,  setCreateCROpen]  = useState(false)
+  const [keysForCR,     setKeysForCR]     = useState<TranslationKeyDTO[]>([])
 
   // Debounce search
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -327,6 +330,17 @@ export function KeysPage() {
           </Button>
           <Button
             size="sm"
+            variant="secondary"
+            onClick={() => {
+              const selected = (keysRes?.data ?? []).filter((k) => selectedIds.has(k.id))
+              setKeysForCR(selected)
+              setCreateCROpen(true)
+            }}
+          >
+            Create CR
+          </Button>
+          <Button
+            size="sm"
             variant="ghost"
             className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
             onClick={() => setSelectedIds(new Set())}
@@ -337,6 +351,11 @@ export function KeysPage() {
       )}
 
       <CreateKeyDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateCRDialog
+        open={createCROpen}
+        onClose={() => { setCreateCROpen(false); setKeysForCR([]) }}
+        preselectedKeys={keysForCR}
+      />
       <KeyDetailSheet
         keyId={selectedKeyId}
         open={sheetOpen}
