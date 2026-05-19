@@ -6,12 +6,15 @@ export const apiClient = axios.create({
   baseURL: '/api/v1',
 })
 
+const DEV_API_TOKEN = import.meta.env.VITE_DEV_API_TOKEN
+
 apiClient.interceptors.request.use(async (config) => {
-  const auth = getAuth(firebaseApp)
-  const token = await auth.currentUser?.getIdToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (DEV_API_TOKEN) {
+    config.headers['X-API-Token'] = DEV_API_TOKEN
+    return config
   }
+  const token = await getAuth(firebaseApp).currentUser?.getIdToken()
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 

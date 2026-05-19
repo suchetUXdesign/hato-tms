@@ -17,24 +17,40 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+// Dev mock mode: when Firebase env vars are not set, use a stub user so the UI renders
+const IS_FIREBASE_CONFIGURED = !!import.meta.env.VITE_FIREBASE_API_KEY
+
+const DEV_MOCK_USER = {
+  uid: 'dev-mock-user',
+  email: 'dev@local',
+  getIdToken: async () => null,
+} as unknown as User
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]       = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const auth = getAuth(firebaseApp)
 
   useEffect(() => {
+    if (!IS_FIREBASE_CONFIGURED) {
+      setUser(DEV_MOCK_USER)
+      setLoading(false)
+      return
+    }
+    const auth = getAuth(firebaseApp)
     return onAuthStateChanged(auth, (u) => {
       setUser(u)
       setLoading(false)
     })
-  }, [auth])
+  }, [])
 
   const handleSignIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password)
+    if (!IS_FIREBASE_CONFIGURED) { setUser(DEV_MOCK_USER); return }
+    await signInWithEmailAndPassword(getAuth(firebaseApp), email, password)
   }
 
   const handleSignOut = async () => {
-    await signOut(auth)
+    if (!IS_FIREBASE_CONFIGURED) { setUser(null); return }
+    await signOut(getAuth(firebaseApp))
   }
 
   return (

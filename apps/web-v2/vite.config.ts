@@ -14,7 +14,7 @@ export default defineConfig({
     port: 3001,
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',   // Firebase emulator Functions port
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:4000',
         changeOrigin: true,
       },
     },
