@@ -437,11 +437,11 @@ __metadata:
   linkType: hard
 
 "@base-ui/react@npm:^1.4.1":
-  version: 1.4.1
-  resolution: "@base-ui/react@npm:1.4.1"
+  version: 1.5.0
+  resolution: "@base-ui/react@npm:1.5.0"
   dependencies:
     "@babel/runtime": "npm:^7.29.2"
-    "@base-ui/utils": "npm:0.2.8"
+    "@base-ui/utils": "npm:0.2.9"
     "@floating-ui/react-dom": "npm:^2.1.8"
     "@floating-ui/utils": "npm:^0.2.11"
     use-sync-external-store: "npm:^1.6.0"
@@ -458,13 +458,13 @@ __metadata:
       optional: true
     date-fns:
       optional: true
-  checksum: 10c0/913361cd1e09f256d95bbd905287a10c34b2dab23482bf4ad5e595e4d72f5ea22e0b0b23657df6b548a938b248be3129c0bf1242c90753b59618a615c9e90ad5
+  checksum: 10c0/ba0f00149d7500d39e0e790b4b6cf19c002f4281508b6076ed1e367ca9a4946eb345e98d4c0dd0ab8e1613807bdcac9d9ad07f6c6d19c3b243a022bb30cbb61b
   languageName: node
   linkType: hard
 
-"@base-ui/utils@npm:0.2.8":
-  version: 0.2.8
-  resolution: "@base-ui/utils@npm:0.2.8"
+"@base-ui/utils@npm:0.2.9":
+  version: 0.2.9
+  resolution: "@base-ui/utils@npm:0.2.9"
   dependencies:
     "@babel/runtime": "npm:^7.29.2"
     "@floating-ui/utils": "npm:^0.2.11"
@@ -477,7 +477,7 @@ __metadata:
   peerDependenciesMeta:
     "@types/react":
       optional: true
-  checksum: 10c0/762ff2251875c08b9e506824d7b45299baef895944d28f633a34c088cd5d6f121ee29267d2afb79527180044d232e56591c4109b2fcab7ac926d7e490c5b2b29
+  checksum: 10c0/169a67fb6a4d86d3ce9fb12bc1e8cb02a67ad3d16872c81798cd6a532c9277383c4066c88356a9813499a87b93b4bf255ea035ea3c6f7298c52adeb1e8e846ce
   languageName: node
   linkType: hard
 
@@ -2180,6 +2180,7 @@ __metadata:
     dayjs: "npm:^1.11.0"
     firebase: "npm:^11.6.0"
     lucide-react: "npm:^0.487.0"
+    msw: "npm:^2.14.6"
     next-themes: "npm:^0.4.6"
     react: "npm:^19.0.0"
     react-dom: "npm:^19.0.0"
@@ -4096,21 +4097,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/query-core@npm:5.100.10":
-  version: 5.100.10
-  resolution: "@tanstack/query-core@npm:5.100.10"
-  checksum: 10c0/fd220485b8223d44877324b0229a7d664c5840f3daf177c4a76e67d1d0be1a78a908b0649b3e275b9cfa7a31250c0770688cc37bb439a90c5b1d7a07974d8828
+"@tanstack/query-core@npm:5.100.11":
+  version: 5.100.11
+  resolution: "@tanstack/query-core@npm:5.100.11"
+  checksum: 10c0/023dac8d751ba05ab3c85d930136f77c93c62639e6fe2cf3b5191bbcf7dbc34ddd29aade85478979b23d0347b3358388200c101f1bdde8561f175164cd888e5f
   languageName: node
   linkType: hard
 
 "@tanstack/react-query@npm:^5.62.0":
-  version: 5.100.10
-  resolution: "@tanstack/react-query@npm:5.100.10"
+  version: 5.100.11
+  resolution: "@tanstack/react-query@npm:5.100.11"
   dependencies:
-    "@tanstack/query-core": "npm:5.100.10"
+    "@tanstack/query-core": "npm:5.100.11"
   peerDependencies:
     react: ^18 || ^19
-  checksum: 10c0/d25e67e78b28463a6db9d48027e194891365e3f21c5278f83f71af6c683951b979853b755388c0eca9e4510bd24c8a59e5d7920c2d7a42bd293bddd2900f901b
+  checksum: 10c0/82859cbd1f973942589b2b4ff110bdd048403c98a51f6c2158eb8b3f4d0999d694ec03566c709ab58bc0a85ecec2a75f1e93c50a76d21b8e7d2897f754ec8189
   languageName: node
   linkType: hard
 
@@ -5870,9 +5871,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.5.328":
-  version: 1.5.358
-  resolution: "electron-to-chromium@npm:1.5.358"
-  checksum: 10c0/86e3e5cb9541fe3a3d435e614b97024fda81c913a60ffa822b156995a8ffa1049f81cfa3e43888dae88d2e2c8254b1b51a8b9169858b3c4093ed3d34dc5de9bb
+  version: 1.5.359
+  resolution: "electron-to-chromium@npm:1.5.359"
+  checksum: 10c0/6366de94995c29a2b67d71eb8896ce54b7f70f096ca12b12068baf41f745a2a200073ee373c8b17d0699f75d4d14f10a172470fcaac7134eaa103663c071729c
   languageName: node
   linkType: hard
 
@@ -5914,12 +5915,12 @@ __metadata:
   linkType: hard
 
 "enhanced-resolve@npm:^5.21.0":
-  version: 5.21.4
-  resolution: "enhanced-resolve@npm:5.21.4"
+  version: 5.21.5
+  resolution: "enhanced-resolve@npm:5.21.5"
   dependencies:
     graceful-fs: "npm:^4.2.4"
     tapable: "npm:^2.3.3"
-  checksum: 10c0/d48d9b61d775ffe41f5ed2223b9aed094ba69b3b9728794848f1a3ce39c62a8d69265ba55726e89e69fa3f0d3974b593f2b24eb09fa2e2cb7e00ab8289791217
+  checksum: 10c0/77cde90acb5c9a729595645fbe5188da1f8225c0096e3c08f1163291cb1a408942fb48c1adee22f5cd9310e874a511ab19adfe3ce09cf3f9e9cc9d6ed6fe48c0
   languageName: node
   linkType: hard
 
@@ -7206,9 +7207,9 @@ __metadata:
   linkType: hard
 
 "hono@npm:^4.11.4":
-  version: 4.12.19
-  resolution: "hono@npm:4.12.19"
-  checksum: 10c0/e124f7216c5633031be979cf9c09f6312ea86e0dd3fe618398922e6d91f9afe889b4e2006ea75565dfdf2de29702e6805cfa2276b2dd4b4f46c682c8672209b7
+  version: 4.12.21
+  resolution: "hono@npm:4.12.21"
+  checksum: 10c0/2d26049eadc7dc879f7a442e127bea5c896b029050dc9fb81c950c190d5bd15da66a161b5132331451584d6a596a59162200f8840e796ddb9ae34a0e358e48a7
   languageName: node
   linkType: hard
 
@@ -8290,7 +8291,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"msw@npm:^2.10.4":
+"msw@npm:^2.10.4, msw@npm:^2.14.6":
   version: 2.14.6
   resolution: "msw@npm:2.14.6"
   dependencies:
@@ -8352,7 +8353,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nanoid@npm:^3.3.11":
+"nanoid@npm:^3.3.12":
   version: 3.3.12
   resolution: "nanoid@npm:3.3.12"
   bin:
@@ -8839,13 +8840,13 @@ __metadata:
   linkType: hard
 
 "postcss@npm:^8.4.43, postcss@npm:^8.5.3, postcss@npm:^8.5.6":
-  version: 8.5.14
-  resolution: "postcss@npm:8.5.14"
+  version: 8.5.15
+  resolution: "postcss@npm:8.5.15"
   dependencies:
-    nanoid: "npm:^3.3.11"
+    nanoid: "npm:^3.3.12"
     picocolors: "npm:^1.1.1"
     source-map-js: "npm:^1.2.1"
-  checksum: 10c0/48138207cf5ef5581be1bfe2cb65ccfe0ac75e43888ba045afc8ed6043d7b56aeb3b9a9fe5b353ff554be943cd0cc15d826ccb991525159175971e5ee8ab0237
+  checksum: 10c0/7f2e63ae22fbe43aace1bf652bd99da4e90737c64194d49e51ddc9cd0f9e51ff2861a7d734379b494deffa03a880a5c65eec70bc29ee9ebaa7136dde3eee8f31
   languageName: node
   linkType: hard
 
@@ -10696,8 +10697,8 @@ __metadata:
   linkType: hard
 
 "tsx@npm:^4.19.0":
-  version: 4.22.2
-  resolution: "tsx@npm:4.22.2"
+  version: 4.22.3
+  resolution: "tsx@npm:4.22.3"
   dependencies:
     esbuild: "npm:~0.28.0"
     fsevents: "npm:~2.3.3"
@@ -10706,7 +10707,7 @@ __metadata:
       optional: true
   bin:
     tsx: dist/cli.mjs
-  checksum: 10c0/5e9a9b5577642b6084bac14450379bdb72567a9bf47b3508470f3ccd530693358ab0c5eb86c57c249260f2ffa0549e2e4cedc93cbe526bbae5ef4d215e1d57a3
+  checksum: 10c0/09a5a7d354ff75e5af6285217d709ec80a46c2ee19e0d9b5c5d00eab81047c3ea6b2a5498a2c5255f3960d6e7acd1a1eee34b9433dc56fb32907ca3b38271f41
   languageName: node
   linkType: hard
 
